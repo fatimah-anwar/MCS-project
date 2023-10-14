@@ -1,5 +1,6 @@
 import mesa
-from .model import State, simpleOD_Model
+from .model import opinionsModel
+from .agent import State
 
 
 def network_portrayal(G):
@@ -33,24 +34,32 @@ def network_portrayal(G):
     return portrayal
 
 
+def get_convergence_spead(model):
+    if model.get_current_step() is not None:
+        conv_spead = str(model.get_current_step())
+        return "Opinions Convergence Spead: {} steps.".format(conv_spead)
+    else:
+        return ""
+
+
 model_params = {
     "N": mesa.visualization.Slider("Number of agents", 10, 10, 100, 10),
     "avg_node_degree": mesa.visualization.Slider("Avg Node Degree", 3, 3, 8, 1),
     "opinion_update_prob": mesa.visualization.Slider("Opinion Upodate Probability", 0.3, 0.0, 1.0, 0.1),
 }
 
-network = mesa.visualization.NetworkModule(network_portrayal, 500, 500)
+network = mesa.visualization.NetworkModule(network_portrayal, 500, 800)
 
 chart = mesa.visualization.ChartModule(
     [
-        {"Label": "low", "Color": "#FF0000"},
+        # {"Label": "low", "Color": "#FF0000"},
         {"Label": "high", "Color": "#008000"},
     ] 
 )
 
 server = mesa.visualization.ModularServer(
-    simpleOD_Model,
-    [network, chart],
+    opinionsModel,
+    [network, get_convergence_spead, chart],
     "Simple OD Model",
     model_params,
 )
