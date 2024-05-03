@@ -29,7 +29,7 @@ class userAgent(mesa.Agent):
         
         #1. opinion
         self.opinion = random.uniform(0, 1) 
-#         self.old_opinion = self.opinion
+        self.old_opinion = self.opinion
     
         # 2. peer trust
         if PT == -1: 
@@ -63,30 +63,44 @@ class userAgent(mesa.Agent):
         else:
             self.decision_th = dt
             
-        # 6. nighbours observed mobility
+        
+        # 6. final decision
+        # self.decision = random.randint(0, 1)
+        # self.decision = self.get_decision(self.opinion)
+
+        if self.opinion < self.decision_th:
+            self.decision = 1 # move
+        elif self.opinion >= self.decision_th:
+            self.decision = 0 # doen't move
+                    
+        self.old_decision = self.decision
+        self.mobility_state = self.set_mobility_state()
+
+        # decision making extra variables
+        self.total_neighbors = 0
         self.moving_neighbors = 0
         self.observed_mobility_rate = 0
         
-        # 7. final decision
         self.online_info = 0
         self.offline_info = 0
         self.combined_info = 0
-        
-        self.decision = random.randint(0, 1)
-        self.old_decision = self.decision
-            
-            
-        self.mobility_state = self.set_mobility_state(self.decision)
-  
 
-    def set_mobility_state(self, decision):
+        # extra counters
+        self.move_counter = 0  # count number of times the agent change its behavior to moving 
+        self.stop_move_counter = 0 # count number of times the agent change its behavior to adopt to lock-down 
+        self.speak_counter = 0 # count number of times the agent deside to speak and share its opinion online
+        self.listen_counter = 0 # count number of times the agent deside to listen and update its opinion online
 
-        if decision == 0:
+
+
+    def set_mobility_state(self):
+
+        if self.decision == 0:
             return State.NO_MOVE
         else:
-            return State.MOVE
-        
-        
+            return State.MOVE    
+
+
     def update_opinion(self):
 
         neighbors = self.model.online_space.get_neighborhood(self.online_node, include_center = False) 
@@ -97,7 +111,14 @@ class userAgent(mesa.Agent):
             
             # other agent speek
             speak_prob = other_agent.opinion ** (1.0 / other_agent.tendency_to_share)
+
             if random.uniform(0, 1) < speak_prob:
+
+                other_agent.speak_counter += 1
+                self.listen_counter += 1
+
+                self.model.communicatin_count += 1
+
                 self.opinion = self.opinion + self.peer_trust * (other_agent.opinion - self.opinion)
 
                 if self.risk_sensitivity == 0:
@@ -107,46 +128,80 @@ class userAgent(mesa.Agent):
             
             # current agent speek
             speak_prob = saved_opinion ** (1.0 / self.tendency_to_share)
+
             if random.uniform(0, 1) < speak_prob:
+
+                self.speak_counter += 1
+                other_agent.listen_counter +=1
+
+                self.model.communicatin_count += 1
+
                 other_agent.opinion = other_agent.opinion + other_agent.peer_trust * (saved_opinion - other_agent.opinion)
 
                 if other_agent.risk_sensitivity == 0:
                     other_agent.opinion = other_agent.opinion / 2.0
                 elif other_agent.risk_sensitivity == 2:
                     other_agent.opinion = (1.0 + other_agent.opinion) / 2.0
-    
+
+          
    
     def get_nighbours_mobility_rate(self):
         
-        cellmates = self.model.physical_space.get_cell_list_contents([self.physical_pos])
-        if len(cellmates) > 1:
-            self.moving_neighbors = sum(1 for a in cellmates if a.unique_id != self.unique_id and a.old_decision == 1)
-            self.observed_mobility_rate = self.moving_neighbors / (len(cellmates)-1)
-        
-        
-    def make_mobililty_decision(self, opinion):
+        neighbors = self.model.physical_space.get_cell_list_contents([self.physical_pos])
+        self.total_neighbors = len(neighbors) - 1
+        if self.total_neighbors > 0:
+            self.moving_neighbors = sum(1 for a in neighbors if a.unique_id != self.unique_id and a.old_decision == 1)
+            self.observed_mobility_rate = self.moving_neighbors / self.total_neighbors
+          
 
+    def make_mobililty_decision(self, step_0 = False):
+
+        # observe the neighbors behavior
         self.get_nighbours_mobility_rate()
         
+        # combine online discussion and offline observation to construct a new relization about the risk 
         self.online_info = self.model.alpha * self.opinion
-        # self.offline_info = self.model.beta * self.observed_mobility_rate
         self.offline_info = (1 - self.model.alpha) * (1 - self.observed_mobility_rate)
         
         self.combined_info = self.online_info + self.offline_info
     
+        # make a decision
         if self.combined_info < self.decision_th:
             self.decision = 1
         elif self.combined_info >= self.decision_th:
             self.decision = 0
             
-        self.mobility_state = self.set_mobility_state(self.decision)
+        self.mobility_state = self.set_mobility_state()
         
-        # updtate opinion:
-        self.opinion = self.combined_info
-#         self.opinion = ( self.model.beta * self.opinion ) + ( (1 - self.model.beta) * self.combined_info )
 
-        
+        if self.decision != self.old_decision:
+            # update the movement status counters
+            if self.decision == 1:
+                self.move_counter += 1
+                self.model.start_moving_count += 1
+                
+            else:
+                self.stop_move_counter += 1 
+                self.model.stop_moving_count += 1
+
+        # update the opinion
+        self.opinion = self.combined_info
+
+
+        # updtate opinion:
+        # if self.model.last_step == 1:
+        #     self.opinion = self.combined_info
+        # elif self.model.last_step == 2:
+        #     self.opinion = ( self.model.gamma * self.opinion ) + ( (1 - self.model.gamma) * self.combined_info )
+
+        # when gamma = 0 -> O = I
+        # when gamma = 1 -> O = O
+        # self.opinion = ( self.model.gamma * self.opinion ) + ( (1 - self.model.gamma) * self.combined_info )
+
+
+   
     def step(self):
-        self.make_mobililty_decision(self.opinion)
         self.update_opinion()
+        self.make_mobililty_decision()
+        
         
