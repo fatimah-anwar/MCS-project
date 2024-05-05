@@ -10,7 +10,7 @@ def opinion_avg(model):
 def combined_info_avg(model):
     return sum(a.combined_info for a in model.online_space.get_all_cell_contents())/model.num_agents
 
-########################################
+
 
 def mobility_count(model):
     return sum(1 for a in model.online_space.get_all_cell_contents() if a.mobility_state is State.MOVE)
@@ -21,7 +21,7 @@ def no_mobility_count(model):
 def mobility_rate(model):
     return mobility_count(model) / model.num_agents
 
-#########################################
+
 
 def get_communicatin_count(model):
     return model.communicatin_count
@@ -29,7 +29,7 @@ def get_communicatin_count(model):
 def communication_rate(model):
     return model.communicatin_count / model.num_agents
 
-##########################################
+
 
 def get_start_moving_count(model):
     return model.start_moving_count
@@ -43,7 +43,7 @@ def start_moving_rate(model):
 def stop_moving_rate(model):
     return model.stop_moving_count / model.num_agents
 
-############################################
+
 
 def get_updated_decision_count(model):
     return model.start_moving_count + model.stop_moving_count
@@ -52,6 +52,8 @@ def updated_decision_rate(model):
     return get_updated_decision_count(model) /model.num_agents
 
 
+############################################
+############################################
 
 
 class myModel(mesa.Model): 
@@ -72,7 +74,14 @@ class myModel(mesa.Model):
             value is -1 : randomly assigned from unifrom distribution 
             other values : all agents will share this value 
     '''
-    def __init__(self, N = 10, w = 10 , h = 10 , alpha = 0.5 , gamma = 1, PT = -1, B = -1, R = -1, dt = -1):
+    def __init__(self, 
+                 N = 10,  
+                 w = 10 , h = 10 , 
+                #  network = "complete_graph", 
+                 alpha = 0.5 , 
+                #  gamma = 1,  # not needed so far
+                 PT = -1, B = -1, R = -1, dt = -1,
+                 collect_agent_data = True, collect_model_data = True):
       
         
         self.num_agents = N
@@ -85,14 +94,17 @@ class myModel(mesa.Model):
         self.dt = dt
         
         self.alpha = alpha # for determining the weights of the online and offline information in influencing the decision
-        self.gamma = gamma # for the last step in the decision making function (updating the opinion)
+        # self.gamma = gamma # for the last step in the decision making function (updating the opinion)
 
+        self.collect_agent_data = collect_agent_data
+        self.collect_model_data = collect_model_data
 
         # extra counters
         self.communicatin_count = 0
         self.start_moving_count = 0
         self.stop_moving_count = 0
 
+        # if network is "complete_graph":
         self.G = nx.complete_graph(n = self.num_agents)
 
         self.agents_initial_opinions = []
@@ -109,46 +121,57 @@ class myModel(mesa.Model):
         self.initialize_agents()  
         self.set_datacollector() 
           
+        self.running = True
         self.datacollector.collect(self)        
 
+    
+    ####################################################
+
+    
     def set_datacollector(self):
-        self.datacollector = mesa.DataCollector(
+
+        model_reporters = {}
+        if self.collect_model_data:
             model_reporters = {
                 "op_avg": opinion_avg,
                 "combined_info_avg": combined_info_avg,
                 
-                # "moving" : mobility_count,
-                # "not_moving" : no_mobility_count,
+                "moving" : mobility_count,
+                "not_moving" : no_mobility_count,
                 "mobility_rate" : mobility_rate,
 
-                # "start_moving_count" :  get_start_moving_count ,
-                # "stop_moving_count" : get_stop_moving_count ,
+                "start_moving_count" :  get_start_moving_count ,
+                "stop_moving_count" : get_stop_moving_count ,
                 "start_moving_rate" : start_moving_rate ,
                 "stop_moving_rate" : stop_moving_rate,
-                # "updated_decision_count" : get_updated_decision_count,
+            
+                "updated_decision_count" : get_updated_decision_count,
                 "updated_decision_rate" : updated_decision_rate,
                 
-                # "communicatin_count" : get_communicatin_count,
+                "communicatin_count" : get_communicatin_count,
                 "communication_rate" : communication_rate,
-            },
+            }
+        
+        agent_reporters = {}
+        if self.collect_agent_data:
             agent_reporters = {
                 "opinion" : "opinion", 
-                # "old_opinion" : "old_opinion",
-                # "physical_pos": "physical_pos",
+                "old_opinion" : "old_opinion",
+                "physical_pos": "physical_pos",
                 
                 "peer_trust" : "peer_trust",
                 "risk_sensitivity": "risk_sensitivity",
                 "tendency_to_share" : "tendency_to_share",
                 "total_neighbors" : "total_neighbors",
                 
-                # "moving_neighbors" : "moving_neighbors",
-                # "observed_mobility": "observed_mobility_rate",
-                # "online_info":"online_info",
-                # "offline_info" : "offline_info",
+                "moving_neighbors" : "moving_neighbors",
+                "observed_mobility": "observed_mobility_rate",
+                "online_info":"online_info",
+                "offline_info" : "offline_info",
                 "combined_info" : "combined_info",
 
                 "decision_th" : "decision_th",
-                # "old_decision":"old_decision",
+                "old_decision":"old_decision",
                 "decision" : "decision",
 
                 "move_counter" : "move_counter" ,
@@ -156,7 +179,9 @@ class myModel(mesa.Model):
                 "speak_counter" : "speak_counter" ,
                 "listen_counter" : "listen_counter" ,
             }
-        )
+
+        self.datacollector = mesa.DataCollector(model_reporters = model_reporters , agent_reporters = agent_reporters)
+
 
 
     def initialize_agents(self):
@@ -178,6 +203,7 @@ class myModel(mesa.Model):
             self.agents_initial_decisions.append(a.decision)
 
 
+
     def reinitialize_agents(self):
         for a in self.online_space.get_all_cell_contents():
             i = a.unique_id
@@ -187,12 +213,15 @@ class myModel(mesa.Model):
         self.set_datacollector()
 
 
+
     def set_alpha(self , new_alpha):
         self.alpha = new_alpha
 
 
+
     def set_gamma(self, new_gamma):
         self.gamma = new_gamma
+
 
 
     def step(self):
@@ -201,7 +230,7 @@ class myModel(mesa.Model):
         
         for a in self.schedule.agents:
             a.old_decision = a.decision
-            a.old_opinion = a.opinion
+            # a.old_opinion = a.opinion
         
         self.communicatin_count = 0
         self.start_moving_count = 0

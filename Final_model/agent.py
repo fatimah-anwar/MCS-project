@@ -17,35 +17,50 @@ class userAgent(mesa.Agent):
         
             value is -1 : randomly assigned from unifrom distribution 
             other values : all agents will share this value 
+
+        pos = location of the agent in the offline grid
+        node = location of the agent in the online network
     '''
     
     def __init__( self, unique_id, model, PT, B, R, dt, pos, node):
         
         super().__init__(unique_id, model)
         
+        # agent's locations in the offline and online environments
         self.physical_pos = pos
         self.online_node = node
-        
-        
+           
         #1. opinion
         self.opinion = random.uniform(0, 1) 
         self.old_opinion = self.opinion
     
         # 2. peer trust
-        if PT == -1: 
-            self.peer_trust = random.uniform(0, 1)
+        if PT == -1:           
+            self.peer_trust = random.uniform(0, 1)  # unifrom distibution between 0 and 1 
+        elif PT == "low":
+            self.peer_trust = random.uniform(0, 0.3)  # unifrom distibution of low values
+        elif PT == "mid":
+            self.peer_trust = random.uniform(0.3, 0.7) # unifrom distibution of mid values
+        elif PT == "high":
+            self.peer_trust = random.uniform(0.7, 1) # unifrom distibution of high values
         else:
-            self.peer_trust = PT
+            self.peer_trust = PT  # all agent will have the same value
         
         # 3. tendency to share
         if B == -1:
-            self.tendency_to_share = random.uniform(0, 1)
+            self.tendency_to_share = random.uniform(0, 1)  # unifrom distibution between 0 and 1 
+        elif B == "low":
+            self.tendency_to_share = random.uniform(0, 0.3)  # unifrom distibution of low values
+        elif B == "mid":
+            self.tendency_to_share = random.uniform(0.3, 0.7) # unifrom distibution of mid values
+        elif B == "high":
+            self.tendency_to_share = random.uniform(0.7, 1) # unifrom distibution of high values
         else:
-            self.tendency_to_share = B
+            self.tendency_to_share = B  # all agent will have the same value
         
         # 4. risk sensitivity
         if R == -1:
-            temp = random.uniform(0, 1)
+            temp = random.uniform(0, 1)  # unifrom distibution  
             if temp < 1.0/3.0:
                 self.risk_sensitivity = 0 
             else:
@@ -55,13 +70,19 @@ class userAgent(mesa.Agent):
                 else:
                     self.risk_sensitivity = 1 
         else:
-            self.risk_sensitivity = R
+            self.risk_sensitivity = R   # all agent will have the same value
                 
         # 5. risk tolerance threshold
         if dt == -1:
-            self.decision_th = random.uniform(0, 1)
+            self.decision_th = random.uniform(0, 1)   # unifrom distibution between 0 and 1 
+        elif dt == "low":
+            self.decision_th = random.uniform(0, 0.3)  # unifrom distibution of low values
+        elif dt == "mid":
+            self.decision_th = random.uniform(0.3, 0.7) # unifrom distibution of mid values
+        elif dt == "high":
+            self.decision_th = random.uniform(0.7, 1) # unifrom distibution of high values
         else:
-            self.decision_th = dt
+            self.decision_th = dt   # all agent will have the same value
             
         
         # 6. final decision
@@ -90,7 +111,7 @@ class userAgent(mesa.Agent):
         self.stop_move_counter = 0 # count number of times the agent change its behavior to adopt to lock-down 
         self.speak_counter = 0 # count number of times the agent deside to speak and share its opinion online
         self.listen_counter = 0 # count number of times the agent deside to listen and update its opinion online
-
+        
 
 
     def set_mobility_state(self):
@@ -160,6 +181,7 @@ class userAgent(mesa.Agent):
         self.get_nighbours_mobility_rate()
         
         # combine online discussion and offline observation to construct a new relization about the risk 
+        self.old_opinion = self.opinion
         self.online_info = self.model.alpha * self.opinion
         self.offline_info = (1 - self.model.alpha) * (1 - self.observed_mobility_rate)
         
@@ -179,7 +201,7 @@ class userAgent(mesa.Agent):
             if self.decision == 1:
                 self.move_counter += 1
                 self.model.start_moving_count += 1
-                
+
             else:
                 self.stop_move_counter += 1 
                 self.model.stop_moving_count += 1
