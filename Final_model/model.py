@@ -1,5 +1,6 @@
 import mesa
 import random
+import numpy as np
 import networkx as nx   
 from agent import userAgent, State
 
@@ -76,17 +77,20 @@ class myModel(mesa.Model):
     '''
     def __init__(self, 
                  N = 10,  
-                 w = 10 , h = 10 , 
-                #  network = "complete_graph", 
+                #  w = 1 , h = 1 , 
+                 grid_dimensions=(1, 1),
+                 network = "complete", 
+                 net_var1_p = 0.1 , net_var2_m = 2,
                  alpha = 0.5 , 
-                #  gamma = 1,  # not needed so far
                  PT = -1, B = -1, R = -1, dt = -1,
                  collect_agent_data = True, collect_model_data = True):
       
         
         self.num_agents = N
-        self.width = w
-        self.height = h
+        # self.width = w
+        # self.height = h
+
+        self.height, self.width = grid_dimensions
         
         self.PT = PT
         self.B = B
@@ -94,7 +98,6 @@ class myModel(mesa.Model):
         self.dt = dt
         
         self.alpha = alpha # for determining the weights of the online and offline information in influencing the decision
-        # self.gamma = gamma # for the last step in the decision making function (updating the opinion)
 
         self.collect_agent_data = collect_agent_data
         self.collect_model_data = collect_model_data
@@ -105,11 +108,13 @@ class myModel(mesa.Model):
         self.stop_moving_count = 0
 
         # if network is "complete_graph":
-        self.G = nx.complete_graph(n = self.num_agents)
+        # self.G = nx.complete_graph(n = self.num_agents)
+        self.G = self.create_network(network, self.num_agents, net_var1_p , net_var2_m)
 
         self.agents_initial_opinions = []
         self.agents_initial_decisions = []
         
+        # networks: 1. complete graph - 2. regular latice - 3. small world network 
 #         avg_node_degree = 5
 #         prob = avg_node_degree / self.num_agents
 #         self.G = nx.erdos_renyi_graph(n=self.num_agents, p=prob)
@@ -184,6 +189,35 @@ class myModel(mesa.Model):
 
 
 
+     # networks: 1. complete graph - 2. regular latice - 3. random network
+    def create_network(self, network_type, nodes_count, net_var1_p , net_var2_m):
+        if network_type == "complete":
+            network = nx.complete_graph(n = nodes_count)
+            
+        # regular lattice -> every node has m edges
+        elif network_type == "regular":
+            network = nx.random_regular_graph(n = nodes_count , d = net_var2_m)
+            
+        # random network
+        elif network_type == "random":
+#             avg_node_degree = 5
+#             prob = avg_node_degree / nodes_count
+            network = nx.erdos_renyi_graph(n = nodes_count, p = net_var1_p)
+
+        
+        # Barabási-Albert Scale-Free Network:
+        # elif network_type == "scale_free":
+        #     network = nx.barabasi_albert_graph(n = nodes_count, m = net_var2_m) # I like this one
+            
+        # # Watts-Strogatz Small-World Network:
+        # elif network_type == "small_world":
+        #     network = nx.watts_strogatz_graph(n = nodes_count, p = net_var1_p , k = net_var2_m) # takes to loong to converge
+          
+       
+        return network
+    
+
+
     def initialize_agents(self):
          for i in range(self.num_agents):
             x = random.randrange(self.physical_space.width)
@@ -191,7 +225,7 @@ class myModel(mesa.Model):
             
             physical_pos = (x , y)
             online_node = i
-                        
+         
             a = userAgent(i, self, self.PT, self.B, self.R, self.dt, physical_pos, online_node)
             
             self.physical_space.place_agent(a, physical_pos)

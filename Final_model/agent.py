@@ -23,13 +23,14 @@ class userAgent(mesa.Agent):
     '''
     
     def __init__( self, unique_id, model, PT, B, R, dt, pos, node):
+    # def __init__( self, unique_id, model, O, PT, B, R, dt, pos, node):
         
         super().__init__(unique_id, model)
         
         # agent's locations in the offline and online environments
         self.physical_pos = pos
         self.online_node = node
-           
+         
         #1. opinion
         self.opinion = random.uniform(0, 1) 
         self.old_opinion = self.opinion
@@ -124,45 +125,47 @@ class userAgent(mesa.Agent):
 
     def update_opinion(self):
 
-        neighbors = self.model.online_space.get_neighborhood(self.online_node, include_center = False) 
-        if len(neighbors) > 0:
-            
-            other_agent = self.random.choice(self.model.online_space.get_cell_list_contents(neighbors))
-            saved_opinion = self.opinion
-            
-            # other agent speek
-            speak_prob = other_agent.opinion ** (1.0 / other_agent.tendency_to_share)
+        if self.model.alpha > 0:
 
-            if random.uniform(0, 1) < speak_prob:
+            neighbors = self.model.online_space.get_neighborhood(self.online_node, include_center = False) 
+            if len(neighbors) > 0:
+                
+                other_agent = self.random.choice(self.model.online_space.get_cell_list_contents(neighbors))
+                saved_opinion = self.opinion
+                
+                # other agent speek
+                speak_prob = other_agent.opinion ** (1.0 / other_agent.tendency_to_share)
 
-                other_agent.speak_counter += 1
-                self.listen_counter += 1
+                if random.uniform(0, 1) < speak_prob:
 
-                self.model.communicatin_count += 1
+                    other_agent.speak_counter += 1
+                    self.listen_counter += 1
 
-                self.opinion = self.opinion + self.peer_trust * (other_agent.opinion - self.opinion)
+                    self.model.communicatin_count += 1
 
-                if self.risk_sensitivity == 0:
-                    self.opinion = self.opinion / 2.0
-                elif self.risk_sensitivity == 2:
-                    self.opinion = (1.0 + self.opinion) / 2.0
-            
-            # current agent speek
-            speak_prob = saved_opinion ** (1.0 / self.tendency_to_share)
+                    self.opinion = self.opinion + self.peer_trust * (other_agent.opinion - self.opinion)
 
-            if random.uniform(0, 1) < speak_prob:
+                    if self.risk_sensitivity == 0:
+                        self.opinion = self.opinion / 2.0
+                    elif self.risk_sensitivity == 2:
+                        self.opinion = (1.0 + self.opinion) / 2.0
+                
+                # current agent speek
+                speak_prob = saved_opinion ** (1.0 / self.tendency_to_share)
 
-                self.speak_counter += 1
-                other_agent.listen_counter +=1
+                if random.uniform(0, 1) < speak_prob:
 
-                self.model.communicatin_count += 1
+                    self.speak_counter += 1
+                    other_agent.listen_counter +=1
 
-                other_agent.opinion = other_agent.opinion + other_agent.peer_trust * (saved_opinion - other_agent.opinion)
+                    self.model.communicatin_count += 1
 
-                if other_agent.risk_sensitivity == 0:
-                    other_agent.opinion = other_agent.opinion / 2.0
-                elif other_agent.risk_sensitivity == 2:
-                    other_agent.opinion = (1.0 + other_agent.opinion) / 2.0
+                    other_agent.opinion = other_agent.opinion + other_agent.peer_trust * (saved_opinion - other_agent.opinion)
+
+                    if other_agent.risk_sensitivity == 0:
+                        other_agent.opinion = other_agent.opinion / 2.0
+                    elif other_agent.risk_sensitivity == 2:
+                        other_agent.opinion = (1.0 + other_agent.opinion) / 2.0
 
           
    
