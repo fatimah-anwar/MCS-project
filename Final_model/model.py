@@ -78,18 +78,18 @@ class myModel(mesa.Model):
     def __init__(self, 
                  N = 10,  
                 #  w = 1 , h = 1 , 
-                 grid_dimensions=(1, 1),
+                 grid_dimensions = (5, 5),
                  network = "complete", 
-                 net_var1_p = 0.1 , net_var2_m = 2,
+                 net_var1_p = 0.1 , net_var2_m = 10,
                  alpha = 0.5 , 
                  PT = -1, B = -1, R = -1, dt = -1,
                  collect_agent_data = True, collect_model_data = True):
       
         
         self.num_agents = N
+
         # self.width = w
         # self.height = h
-
         self.height, self.width = grid_dimensions
         
         self.PT = PT
@@ -99,6 +99,8 @@ class myModel(mesa.Model):
         
         self.alpha = alpha # for determining the weights of the online and offline information in influencing the decision
 
+        self.G = self.create_network(network, self.num_agents, net_var1_p , net_var2_m)
+        
         self.collect_agent_data = collect_agent_data
         self.collect_model_data = collect_model_data
 
@@ -107,18 +109,9 @@ class myModel(mesa.Model):
         self.start_moving_count = 0
         self.stop_moving_count = 0
 
-        # if network is "complete_graph":
-        # self.G = nx.complete_graph(n = self.num_agents)
-        self.G = self.create_network(network, self.num_agents, net_var1_p , net_var2_m)
-
         self.agents_initial_opinions = []
         self.agents_initial_decisions = []
         
-        # networks: 1. complete graph - 2. regular latice - 3. small world network 
-#         avg_node_degree = 5
-#         prob = avg_node_degree / self.num_agents
-#         self.G = nx.erdos_renyi_graph(n=self.num_agents, p=prob)
-
         self.physical_space = mesa.space.MultiGrid(width = self.width , height = self.height, torus = True)
         self.online_space = mesa.space.NetworkGrid(g = self.G)
         self.schedule = mesa.time.RandomActivation(self)
@@ -132,7 +125,72 @@ class myModel(mesa.Model):
     
     ####################################################
 
+
+    def create_network(self, network_type, nodes_count, net_var1_p , net_var2_m):
+        if network_type == "complete":
+            network = nx.complete_graph(n = nodes_count)
+                 
+        # random network
+        elif network_type == "random":
+#             avg_node_degree = 5
+#             prob = avg_node_degree / nodes_count
+            network = nx.erdos_renyi_graph(n = nodes_count, p = net_var1_p)
+       
+        # regular lattice -> every node has m edges
+        elif network_type == "regular":
+            network = nx.random_regular_graph(n = nodes_count , d = net_var2_m)
+ 
+        # Watts-Strogatz Small-World Network:
+        elif network_type == "small_world":
+            network = nx.watts_strogatz_graph(n = nodes_count, p = net_var1_p , k = net_var2_m) # takes to loong to converge
+          
+        # Barabási-Albert Scale-Free Network:
+        elif network_type == "scale_free":
+            network = nx.barabasi_albert_graph(n = nodes_count, m = net_var2_m) # I like this one
+
+        return network
     
+
+
+    def initialize_agents(self):
+         for i in range(self.num_agents):
+            x = random.randrange(self.physical_space.width)
+            y = random.randrange(self.physical_space.height)
+            
+            physical_pos = (x , y)
+            online_node = i
+         
+            a = userAgent(i, self, self.PT, self.B, self.R, self.dt, physical_pos, online_node)
+            
+            self.physical_space.place_agent(a, physical_pos)
+            self.online_space.place_agent(a, online_node)
+            
+            self.schedule.add(a)
+            
+            self.agents_initial_opinions.append(a.opinion)
+            self.agents_initial_decisions.append(a.decision)
+
+
+
+    def reinitialize_agents(self):
+        for a in self.online_space.get_all_cell_contents():
+            i = a.unique_id
+            a.opinion = a.old_opinion = self.agents_initial_opinions[i]
+            a.decision = a.old_decision = self.agents_initial_decisions[i]
+
+        self.set_datacollector()
+
+
+    def set_alpha(self , new_alpha):
+        self.alpha = new_alpha
+
+
+
+    # def set_gamma(self, new_gamma):
+    #     self.gamma = new_gamma
+
+
+        
     def set_datacollector(self):
 
         model_reporters = {}
@@ -167,7 +225,8 @@ class myModel(mesa.Model):
                 "peer_trust" : "peer_trust",
                 "risk_sensitivity": "risk_sensitivity",
                 "tendency_to_share" : "tendency_to_share",
-                "total_neighbors" : "total_neighbors",
+                "offline_neighbors" : "offline_neighbors",
+                "online_neighbors" : "online_neighbors",
                 
                 "moving_neighbors" : "moving_neighbors",
                 "observed_mobility": "observed_mobility_rate",
@@ -186,76 +245,6 @@ class myModel(mesa.Model):
             }
 
         self.datacollector = mesa.DataCollector(model_reporters = model_reporters , agent_reporters = agent_reporters)
-
-
-
-     # networks: 1. complete graph - 2. regular latice - 3. random network
-    def create_network(self, network_type, nodes_count, net_var1_p , net_var2_m):
-        if network_type == "complete":
-            network = nx.complete_graph(n = nodes_count)
-            
-        # regular lattice -> every node has m edges
-        elif network_type == "regular":
-            network = nx.random_regular_graph(n = nodes_count , d = net_var2_m)
-            
-        # random network
-        elif network_type == "random":
-#             avg_node_degree = 5
-#             prob = avg_node_degree / nodes_count
-            network = nx.erdos_renyi_graph(n = nodes_count, p = net_var1_p)
-
-        
-        # Barabási-Albert Scale-Free Network:
-        # elif network_type == "scale_free":
-        #     network = nx.barabasi_albert_graph(n = nodes_count, m = net_var2_m) # I like this one
-            
-        # # Watts-Strogatz Small-World Network:
-        # elif network_type == "small_world":
-        #     network = nx.watts_strogatz_graph(n = nodes_count, p = net_var1_p , k = net_var2_m) # takes to loong to converge
-          
-       
-        return network
-    
-
-
-    def initialize_agents(self):
-         for i in range(self.num_agents):
-            x = random.randrange(self.physical_space.width)
-            y = random.randrange(self.physical_space.height)
-            
-            physical_pos = (x , y)
-            online_node = i
-         
-            a = userAgent(i, self, self.PT, self.B, self.R, self.dt, physical_pos, online_node)
-            
-            self.physical_space.place_agent(a, physical_pos)
-            self.online_space.place_agent(a, online_node)
-            
-            self.schedule.add(a)
-            
-            self.agents_initial_opinions.append(a.opinion)
-            self.agents_initial_decisions.append(a.decision)
-
-
-
-    def reinitialize_agents(self):
-        for a in self.online_space.get_all_cell_contents():
-            i = a.unique_id
-            a.opinion = a.old_opinion = self.agents_initial_opinions[i]
-            a.decision = a.old_decision = self.agents_initial_decisions[i]
-
-        self.set_datacollector()
-
-
-
-    def set_alpha(self , new_alpha):
-        self.alpha = new_alpha
-
-
-
-    def set_gamma(self, new_gamma):
-        self.gamma = new_gamma
-
 
 
     def step(self):

@@ -99,7 +99,8 @@ class userAgent(mesa.Agent):
         self.mobility_state = self.set_mobility_state()
 
         # decision making extra variables
-        self.total_neighbors = 0
+        self.offline_neighbors = 0
+        self.online_neighbors = 0
         self.moving_neighbors = 0
         self.observed_mobility_rate = 0
         
@@ -114,6 +115,8 @@ class userAgent(mesa.Agent):
         self.listen_counter = 0 # count number of times the agent deside to listen and update its opinion online
         
 
+    ####################################################
+
 
     def set_mobility_state(self):
 
@@ -123,11 +126,14 @@ class userAgent(mesa.Agent):
             return State.MOVE    
 
 
+
     def update_opinion(self):
 
         if self.model.alpha > 0:
 
             neighbors = self.model.online_space.get_neighborhood(self.online_node, include_center = False) 
+            self.online_neighbors = len(neighbors)
+
             if len(neighbors) > 0:
                 
                 other_agent = self.random.choice(self.model.online_space.get_cell_list_contents(neighbors))
@@ -172,13 +178,15 @@ class userAgent(mesa.Agent):
     def get_nighbours_mobility_rate(self):
         
         neighbors = self.model.physical_space.get_cell_list_contents([self.physical_pos])
-        self.total_neighbors = len(neighbors) - 1
-        if self.total_neighbors > 0:
+        self.offline_neighbors = len(neighbors) - 1
+
+        if self.offline_neighbors > 0:
             self.moving_neighbors = sum(1 for a in neighbors if a.unique_id != self.unique_id and a.old_decision == 1)
-            self.observed_mobility_rate = self.moving_neighbors / self.total_neighbors
+            self.observed_mobility_rate = self.moving_neighbors / self.offline_neighbors
           
 
-    def make_mobililty_decision(self, step_0 = False):
+
+    def make_mobililty_decision(self):
 
         # observe the neighbors behavior
         self.get_nighbours_mobility_rate()
