@@ -48,12 +48,12 @@ class opinionsModel(mesa.Model):
 
         self.num_agents = N
 
-        # self.G = nx.complete_graph(n = self.num_agents)
+        self.G = nx.complete_graph(n = self.num_agents)
         
         # random network structure based on the specified average node degree and the total number of nodes
-        avg_node_degree = 5
-        prob = avg_node_degree / self.num_agents
-        self.G = nx.erdos_renyi_graph(n=self.num_agents, p=prob)
+        # avg_node_degree = 5
+        # prob = avg_node_degree / self.num_agents
+        # self.G = nx.erdos_renyi_graph(n=self.num_agents, p=prob)
 
         # self.largest_component_size = len(max(nx.connected_components(self.G), key=len))
         
